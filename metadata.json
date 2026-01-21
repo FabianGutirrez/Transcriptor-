@@ -1,0 +1,5 @@
+{
+  "name": "Transcriptor Fonoaudiológico AI",
+  "description": "Una aplicación para transcribir grabaciones de audio con 'Fidelidad Radical' utilizando la API de Gemini. Diseñada para fonoaudiólogos y lingüistas clínicos para analizar el desempeño verbal de los sujetos, capturando errores fonéticos, gramaticales y disfluencias sin corrección.",
+  "requestFramePermissions": []
+}
