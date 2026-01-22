@@ -1,10 +1,14 @@
-
 import React, { useState, useCallback } from 'react';
 import { Header } from './components/Header';
 import { AudioUploader } from './components/AudioUploader';
 import { TranscriptionResult } from './components/TranscriptionResult';
 import { LoadingSpinner, AlertTriangleIcon } from './components/Icons';
-import { transcribeMedia } from './services/geminiService';
+
+// Definimos la interfaz aquí para evitar errores de importación si el servicio fallaba
+interface TranscriptionData {
+  transcription: string;
+  notes: string;
+}
 
 const App: React.FC = () => {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -19,7 +23,17 @@ const App: React.FC = () => {
     setNotes(null);
     setError(null);
   };
-  
+
+  // Función para convertir el archivo a Base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleTranscription = useCallback(async () => {
     if (!mediaFile) return;
 
@@ -29,12 +43,36 @@ const App: React.FC = () => {
     setNotes(null);
 
     try {
-      const result = await transcribeMedia(mediaFile);
+      // 1. Convertimos el archivo a Base64 para enviarlo por JSON
+      const base64Data = await fileToBase64(mediaFile);
+      const pureBase64 = base64Data.split(',')[1]; 
+
+      // 2. Llamada directa a tu API en Vercel
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audioData: pureBase64,
+          mimeType: mediaFile.type,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error en el servidor');
+      }
+
+      const result: TranscriptionData = await response.json();
+      
+      // 3. Actualizamos el estado con la respuesta del backend
       setTranscription(result.transcription);
       setNotes(result.notes);
+
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Ocurrió un error desconocido durante la transcripción.');
+      console.error("Error detallado:", err);
+      setError(err instanceof Error ? err.message : 'Error al conectar con el servidor de transcripción.');
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +84,7 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="bg-white/80 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
           <p className="text-slate-600 mb-6 text-center">
-            Sube un archivo de audio o video para obtener una transcripción de "Fidelidad Radical", diseñada para el análisis clínico lingüístico.
+            Sube un archivo para análisis fonoaudiológico. La transcripción se procesa de forma segura en el servidor.
           </p>
 
           <AudioUploader onFileChange={handleFileChange} disabled={isLoading} />
@@ -55,12 +93,12 @@ const App: React.FC = () => {
             <button
               onClick={handleTranscription}
               disabled={!mediaFile || isLoading}
-              className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg shadow-md hover:bg-teal-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-all duration-300 ease-in-out"
             >
               {isLoading ? (
                 <>
                   <LoadingSpinner />
-                  Transcribiendo...
+                  Procesando con Gemini...
                 </>
               ) : (
                 'Transcribir Archivo'
@@ -70,12 +108,12 @@ const App: React.FC = () => {
         </div>
 
         {error && (
-           <div className="mt-8 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg flex items-center gap-3" role="alert">
-              <AlertTriangleIcon className="h-6 w-6 text-red-600" />
-              <div>
-                <p className="font-bold">Error</p>
-                <p>{error}</p>
-              </div>
+          <div className="mt-8 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg flex items-center gap-3" role="alert">
+            <AlertTriangleIcon className="h-6 w-6 text-red-600" />
+            <div>
+              <p className="font-bold">Error de Servidor</p>
+              <p>{error}</p>
+            </div>
           </div>
         )}
         
@@ -84,11 +122,10 @@ const App: React.FC = () => {
             <TranscriptionResult transcription={transcription} notes={notes} />
           </div>
         )}
-
       </main>
-       <footer className="text-center py-6 text-slate-500 text-sm">
-          <p>Potenciado por Gemini API. Creado para análisis fonoaudiológico.</p>
-        </footer>
+      <footer className="text-center py-6 text-slate-500 text-sm">
+        <p>Potenciado por Gemini 1.5 Flash. Transcripción segura vía Vercel Serverless.</p>
+      </footer>
     </div>
   );
 };
