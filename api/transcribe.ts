@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export default async function handler(req, res) {
-  // Manejar el método POST
+  // 1. Forzar método POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
@@ -9,14 +9,14 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY; 
   
   if (!apiKey) {
-    return res.status(500).json({ error: "API Key no configurada en Vercel" });
+    return res.status(500).json({ error: "API Key no configurada en el servidor" });
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   try {
-    const { audioData, mimeType } = req.body; // Node.js usa req.body
+    const { audioData, mimeType } = req.body; 
 
     const result = await model.generateContent([
       {
