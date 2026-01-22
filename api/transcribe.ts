@@ -1,22 +1,22 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const config = {
-  runtime: 'edge', // Esto hace que la respuesta sea más rápida
-};
+export default async function handler(req, res) {
+  // Manejar el método POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
 
-export default async function handler(req: Request) {
-  // Vercel leerá GEMINI_API_KEY desde su panel de control (Environment Variables)
   const apiKey = process.env.GEMINI_API_KEY; 
   
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "API Key no configurada en el servidor" }), { status: 500 });
+    return res.status(500).json({ error: "API Key no configurada en Vercel" });
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   try {
-    const { audioData, mimeType } = await req.json();
+    const { audioData, mimeType } = req.body; // Node.js usa req.body
 
     const result = await model.generateContent([
       {
@@ -28,12 +28,11 @@ export default async function handler(req: Request) {
       "Transcribe este audio detalladamente para un informe fonoaudiológico."
     ]);
 
-    return new Response(JSON.stringify({ text: result.response.text() }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await result.response;
+    return res.status(200).json({ text: response.text() });
+
   } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: "Error al procesar con Gemini" }), { status: 500 });
+    console.error("Error en Gemini:", error);
+    return res.status(500).json({ error: "Error al procesar con Gemini" });
   }
 }
